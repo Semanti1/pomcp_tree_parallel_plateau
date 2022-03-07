@@ -7,7 +7,7 @@ EXPERIMENT::PARAMS::PARAMS()
 :   NumRuns(1000),
     NumSteps(100000),
     SimSteps(1000),
-    TimeOut(10000),
+    TimeOut(20000),
     MinDoubles(0),
     MaxDoubles(20),
     TransformDoubles(-4),

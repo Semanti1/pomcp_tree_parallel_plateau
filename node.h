@@ -58,16 +58,20 @@ public:
         //std::unique_lock <std::shared_mutex> lock(m);
 //#pragma omp atomic
         Count += 1.0;
-        //#pragma omp atomic
+       // #pragma omp atomic
         Total += totalReward;
      //   m->unlock();
     }
     void Virtualloss(double loss)
     {
-       // std::lock_guard<std::mutex> lock(m);
+        //std::lock_guard<std::mutex> lock(*m);
       //  std::unique_lock <std::shared_mutex> lock(m);
-//#pragma omp atomic
+#pragma omp atomic
         Total = Total +  loss;
+
+//#pragma omp atomic
+        //Total = Total + loss;
+       // Count = Count + 1.0;
     }
 
     void Add(double totalReward, COUNT weight)

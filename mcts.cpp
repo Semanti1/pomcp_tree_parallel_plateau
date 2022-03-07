@@ -166,6 +166,9 @@ void MCTS::UCTSearch()
     //PeakTreeDepth = 0;
     omp_set_num_threads(6);
     vnodelocks.emplace(Root, new std::mutex);
+    vmtx.lock();
+    auto lockithereR = vnodelocks[Root];
+    vmtx.unlock();
     #pragma omp parallel for //shared(Root,Simulator,Params,History) //firstprivate(TreeDepth,PeakTreeDepth) //reduction(max:TreeDepth,max:PeakTreeDepth)
     for (int n = 0; n < Params.NumSimulations; n++)
     {
@@ -178,9 +181,9 @@ void MCTS::UCTSearch()
         HISTORY hthread = History;
         
 
-        vmtx.lock();
+        /*vmtx.lock();
         auto lockithereR = vnodelocks[Root];
-        vmtx.unlock();
+        vmtx.unlock();*/
            
         state = Root->Beliefs().CreateSample(Simulator, lockithereR);
         //state = Root->Beliefs().CreateSample(Simulator, Root->getmutex());
@@ -214,6 +217,8 @@ double MCTS::SimulateV(STATE& state, VNODE* vnode, int& treedepth, int& peaktree
     {
         vnodelocks.emplace(vnode, new std::mutex);
     }
+    //vnode->Value.Addm(-1, vnodelocks[vnode]);
+    //vnode->Value.Virtualloss(-1);
     vmtx.unlock();
     int action;
 
@@ -245,6 +250,8 @@ double MCTS::SimulateV(STATE& state, VNODE* vnode, int& treedepth, int& peaktree
         //qnodelocks.emplace(newqnode, new std::mutex);
         qnodelocks.emplace(&qnode, new std::mutex);
     }
+    //qnode.Value.Addm(-1, qnodelocks[&qnode]);
+    //qnode.Value.Virtualloss(-1);
     qmtx.unlock();
    
     double totalReward = SimulateQ(state, qnode, action, treedepth,peaktreedepth,hist);
@@ -252,7 +259,8 @@ double MCTS::SimulateV(STATE& state, VNODE* vnode, int& treedepth, int& peaktree
     vmtx.lock();
     auto lockithere = vnodelocks[vnode];
     vmtx.unlock();
-    //vnode->Value.Addm(totalReward, lockithere);
+    vnode->Value.Addm(totalReward, lockithere);
+    //vnode->Value.Addm(totalReward);
     //vnode->Value.Addm(totalReward, vnode->getmutex());
     AddRave(vnode, totalReward, treedepth, hist,lockithere);
     //AddRave(vnode, totalReward, treedepth, hist, vnode->getmutex());
@@ -287,13 +295,22 @@ double MCTS::SimulateQ(STATE& state, QNODE& qnode, int action, int& treedepth, i
    // lock();
     int ct = 0;
     VNODE*& vnode = qnode.Child(observation);
-    
-
-   
+    /*vmtx.lock();
+    auto lockit = vnodelocks.find(vnode);
+    if (!(lockit != vnodelocks.end()))
+    {
+        vnodelocks.emplace(vnode, new std::mutex);
+    }
+    //vnode->Value.Addm(-1, vnodelocks[vnode]);
+    //vnode->Value.Virtualloss(-1);
+    auto lockvnode = vnodelocks[vnode];
+    vmtx.unlock();*/
+    //auto lockvnode = vnodelocks[vnode];
+   // (*lockvnode).lock();
     if (!vnode && !terminal && qnode.Value.GetCount() >= Params.ExpandCount)
         vnode = ExpandNode(&state,hist);
 
-  
+   //(*lockvnode).unlock();
 
     if (!terminal)
     {
@@ -317,6 +334,7 @@ double MCTS::SimulateQ(STATE& state, QNODE& qnode, int action, int& treedepth, i
     //qnode.Value.Addm(totalReward, qnodelocks[&qnode]);
     qmtx.unlock();
     qnode.Value.Addm(totalReward, lockithereq);
+    //qnode.Value.Addm(totalReward);
     //qnode.Value.Add(totalReward);
    
 
@@ -463,7 +481,8 @@ double MCTS::Rollout(STATE& state, int treedepth, HISTORY& hist)
         int action;
 //#pragma omp critical
       //  {
-        action = Simulator.SelectRandom(state, History, Status);
+        //action = Simulator.SelectRandom(state, History, Status);
+        action = Simulator.SelectRandom(state, hist, Status);
         terminal = Simulator.Step(state, action, observation, reward);
       //  #pragma omp critical
         {
